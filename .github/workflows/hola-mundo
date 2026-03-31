@@ -1,0 +1,72 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Workflow - Continuous integration (CI)
+
+# Controls when the workflow will run
+on:
+  workflow_dispatch:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
+  push:
+    branches:
+      - aprendiendo-github-actions
+# Reference https://docs.github.com/en/actions/security-guides/automatic-token-authentication
+permissions:
+  # Need `contents: read` to checkout the repository
+  # Need `contents: write` to update the step metadata
+  contents: write
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # Get the current step from .github/script/STEP so we can
+  # limit running the main job when the learner is on the same step.
+  obtain_step_actually:
+    name: verify step
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: obtain_step
+        run: |
+          echo "step_actually=$(cat ./.github/script/STEP)" >> $GITHUB_OUTPUT
+    outputs:
+      step_actually: ${{ steps.obtain_step.outputs.step_actually }}
+
+  create_hello_world:
+    name: Create Hellos World
+    needs: obtain_step_actually
+
+    # We will only run this action when:
+    # 1. This repository isn't the template repository
+    # 2. The STEP is currently 1
+    # Reference https://docs.github.com/en/actions/learn-github-actions/contexts
+    # Reference https://docs.github.com/en/actions/learn-github-actions/expressions
+    if: >-
+      ${{ !github.event.repository.is_template
+          && needs.obtain_step_actually.outputs.step_actually == 1 }}
+
+    # We'll run Ubuntu for performance instead of Mac or Windows
+    runs-on: ubuntu-latest
+
+    steps:
+      # We'll need to check out the repository so that we can edit the README
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Let's get all the branches
+
+      # Verify the learner added the file contents
+      - name: Verify Content new Workflow
+        run: ./.github/script/check-file.sh
+        env:
+          FILE: ".github/workflows/hola-mundo.yml"
+          SEARCH: "name:"
+
+      # Update README to close <details id=1> and open <details id=2>
+      # and set STEP to '2'
+      - name: Update to step 2
+        uses: skills/action-update-step@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          from_step: 1
+          to_step: 2
+          branch_name: aprendiendo-github-actions
